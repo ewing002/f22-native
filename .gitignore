@@ -1,0 +1,27 @@
+build/
+build-*/
+dist/
+*.bmp
+*.sav
+*.log
+# test logs written next to the exe by the self-tests
+autotest.txt
+viewtest.txt
+aivmtest.txt
+aiflight.txt
+menutest.txt
+joytest.txt
+soundtest.txt
+dumptex.txt
+taxidump.txt
+videotest.txt
+# never commit original game content or anything derived from it
+RESOURCE.RES
+F22.EXE
+F22_decrypted.bin
+extracted/
+video/
+textures/
+*.KDV
+*.RES
+__pycache__/
