@@ -15,7 +15,7 @@ Write reports, docs and code comments in English. The owner writes Hungarian in 
 - The owner runs the Windows exe from a game folder holding `RESOURCE.RES`, `F22_decrypted.bin`, `video\` (see README.md). After a change that is
   worth playing, build, run the self-tests, copy the exe (and docs) into the owner's package and rebuild its zip.
 - Settings and progress: `f22native.sav` next to the exe (do not overwrite the owner's save when testing: run tests from a copy of the folder).
-- Personal-use project ("a game of my childhood"); the GitHub repository is private.
+- Fan project, not affiliated with NovaLogic. The repository is public.
 
 ## Files at run time
 | File | Role |
