@@ -41,7 +41,8 @@ void basis(double hdg, double pitch, double roll, D3& f, D3& up, D3& right);
 // Reverse-engineered view of the original program (tables, constants)
 struct Exe {
   std::vector<uint8_t> d;
-  bool load(const std::string& path);
+  bool load(const std::string& path);          // an already decrypted image (F22_decrypted.bin)
+  bool loadGameExe(const std::string& path);   // the original F22.EXE, decrypted in memory
   int32_t i32(uint32_t a) const;
   uint16_t u16(uint32_t a) const;
   uint8_t u8(uint32_t a) const { return d[a]; }

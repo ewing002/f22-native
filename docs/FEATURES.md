@@ -5,8 +5,11 @@ A native Windows program (C++17, Win32 + OpenGL 3.3) with no external libraries 
 - **Data:** read directly from the original `RESOURCE.RES` (terrain, 3D models, missions).
 - **Game rules:** reverse engineered from the original `F22.EXE` – flight model, weapons,
   enemy AI, SAM / anti-aircraft guns, mission triggers (`src/sim.cpp`, with the original
-  addresses in the code). At run time the tables are read from the decrypted image of the original program
-  (`extracted\F22_decrypted.bin`), so the game's data is not in the source code.
+  addresses in the code). At run time the tables are read from the original program: the player's own `F22.EXE`
+  is decrypted in memory (`sim::Exe::loadGameExe`, the two XOR passes of its start-up stub 0x2514; an `F22_decrypted.bin`
+  is accepted as a fallback), so the game's data is not in the source code.
+- **Launcher:** `f22launcher.exe` (`src/launcher/launcher.cpp`) – game folder check / choice, HD textures, fullscreen, window size,
+  volumes, skip intro, original AI, texture export; it writes the game's `f22native.sav` "opt" line and `f22launcher.ini`.
 
 ## Command-line switches
 
@@ -22,6 +25,10 @@ build\f22native.exe --fxtest C04M01        (images of the effects: fx_*.bmp)
 build\f22native.exe --wingtest C04M01      (trial of the wingman commands: viewtest.txt)
 build\f22native.exe --topdown C04M01 2500   (the airfield from above, from 2500 m: topdown_*.bmp;
                                              negative altitude: a low view along the runway)
+build\f22native.exe --exe <F22.EXE>         (the original program elsewhere; default: next to RESOURCE.RES, then next to the exe)
+build\f22native.exe --exetest              (in-memory decryption of F22.EXE vs. F22_decrypted.bin: exetest.txt)
+build\f22native.exe --size 1600x900        (window size, default 1280x720)
+build\f22native.exe --nointro              (no start-up videos)
 ```
 
 The campaign progress and the pilot statistics are stored in `build\f22native.sav`.
@@ -210,7 +217,7 @@ The HUD instruments – as in the original – are only visible in the F2 views.
   is still an approximation (see under time of day).
 
 ### Replaceable textures (`textures` folder next to the program)
-- An addition, not in the original. Dumping the original textures: `f22native.exe --dumptex` (or the supplied `textura_kiiras.bat`): into the
+- An addition, not in the original. Dumping the original textures: `f22native.exe --dumptex` (or "Export textures" in the launcher): into the
   `textures` folder go the textures of every model (`<NAME>.png`, e.g. `F2201.png`, ~370 files) and the tiles of the four terrain sets
   (`terrain_T<terrain>_<000..127>.png`, 128x128). It does not overwrite an existing file.
 - Replacing: edit (or replace) the file with any image editor, keeping the same name; at startup the program loads from the `textures` folder

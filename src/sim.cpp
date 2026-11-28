@@ -43,6 +43,46 @@ bool Exe::load(const std::string& path) {
   d.assign(std::istreambuf_iterator<char>(f), {});
   return d.size() > 0x8a000 && std::memcmp(&d[0x50f18], "bin01.bin", 9) == 0;
 }
+
+// F22.EXE = MZ stub + FlashTek X-386 extender; the 32-bit program image starts at file offset 0xC8ED and is
+// loaded at address 0. Its start-up stub (0x2514) decrypts 0x24C4-0x8A9A6 in two passes before jumping to the
+// game (0x8A7B1 -> 0x5BE2C). This repeats those passes, so the result is the same 2 MiB flat image that
+// tools/f22unpack.py dumps (identical byte for byte, including the stub's self-patches and its return address).
+bool Exe::loadGameExe(const std::string& path) {
+  std::ifstream f(path, std::ios::binary);
+  if (!f) return false;
+  std::vector<uint8_t> raw((std::istreambuf_iterator<char>(f)), {});
+  const size_t IMG = 0xC8ED, END = 0x8A9A6, SIZE = 0x200000;
+  if (raw.size() < IMG + END || raw[0] != 'M' || raw[1] != 'Z' || raw.size() - IMG > SIZE) return false;
+  std::vector<uint8_t> m(SIZE, 0);
+  std::memcpy(m.data(), raw.data() + IMG, raw.size() - IMG);
+  auto rd = [&](uint32_t a) { uint32_t v; std::memcpy(&v, &m[a], 4); return v; };
+  auto wr = [&](uint32_t a, uint32_t v) { std::memcpy(&m[a], &v, 4); };
+  // pass 1 (0x2568): the first 0x40 bytes of the second stub, fixed key pair
+  for (uint32_t a = 0x24C4; a < 0x24C4 + 0x40; a += 8) {
+    wr(a, rd(a) ^ 0x9324ABE1u);
+    wr(a + 4, rd(a + 4) ^ 0x439A9EFAu);
+  }
+  // the stub patches its own loop (0x279D / 0x27A3) before running it
+  wr(0x258B, 0x1ABB09BDu);   // mov ebp, 0x001ABB09
+  wr(0x259F, 0x5E310631u);   // xor [esi], eax / xor [esi+4], ebx
+  // pass 2 (0x259F): rolling key over 0x27B0-0x8A9A6
+  uint32_t eax = 0x2349EB12u, ebx = 0x439A9EFAu;
+  const uint32_t ebp = 0x001ABB09u;
+  for (uint32_t ecx = uint32_t(END - 0x27B0) >> 3, esi = 0x27B0; ecx; ecx--, esi += 8) {
+    wr(esi, rd(esi) ^ eax);
+    wr(esi + 4, rd(esi + 4) ^ ebx);
+    ebx = (ebx >> 1) | (ebx << 31);                 // ror ebx, 1
+    eax = (eax << 9) | (eax >> 23);                 // rol eax, 9
+    if (eax & 0x80000000u) eax += ebp;              // cdq / and edx, ebp / add eax, edx
+    ebx ^= ecx;
+  }
+  // the stub's own check of the result (0x25B9 / 0x25CC)
+  if (rd(0x27B0) != 0xA24BC68Du || rd(0x27B4) != 0xB35CD79Fu) return false;
+  wr(0x21BC, 0x0008A7B6u);   // return address left on the stub's stack by "call 0x5BE2C"
+  d.swap(m);
+  return std::memcmp(&d[0x50f18], "bin01.bin", 9) == 0;
+}
 int32_t Exe::i32(uint32_t a) const { int32_t v; std::memcpy(&v, &d[a], 4); return v; }
 uint16_t Exe::u16(uint32_t a) const { return uint16_t(d[a] | d[a + 1] << 8); }
 

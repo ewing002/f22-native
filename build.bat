@@ -1,5 +1,5 @@
 @echo off
-rem Builds f22native.exe on Windows with Visual Studio 2022 (MSVC) and puts it into dist\F22Native\.
+rem Builds f22native.exe and f22launcher.exe on Windows with Visual Studio 2022 (MSVC) and puts them into dist\F22Native\.
 rem Needs: CMake and the "Desktop development with C++" tools; no game data is needed to build.
 setlocal EnableExtensions
 cd /d "%~dp0"
@@ -21,6 +21,7 @@ cmake --build build --config Release || exit /b 1
 if exist dist rmdir /s /q dist
 mkdir dist\F22Native
 copy build\Release\f22native.exe dist\F22Native\ >nul
+copy build\Release\f22launcher.exe dist\F22Native\ >nul
 py tools\package.py build\Release dist\F22Native-release.zip
 echo.
-echo Done: dist\F22Native\f22native.exe  (copy it next to RESOURCE.RES, see README.md)
+echo Done: dist\F22Native\f22native.exe and f22launcher.exe  (copy them next to F22.EXE and RESOURCE.RES, see README.md)

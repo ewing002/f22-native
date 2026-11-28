@@ -5,15 +5,16 @@ libraries and no web technology** (standing rule from the owner: no web-based so
 like the original.** Game rules come from reverse engineering `F22.EXE` (decrypted flat image, file offset = virtual address),
 never from invention; where the original is not known the code and `docs/FEATURES.md` say "approximation".
 
-The program contains no original data: it reads `RESOURCE.RES` and `F22_decrypted.bin` (made from the owner's own `F22.EXE`) at run time.
+The program contains no original data: it reads `RESOURCE.RES` and the owner's own `F22.EXE` at run time (`F22.EXE` is decrypted in memory
+by `sim::Exe::loadGameExe`, byte-identical to what `tools/f22unpack.py` dumps; a ready `F22_decrypted.bin` is still accepted as a fallback).
 **Never commit** `F22.EXE`, `RESOURCE.RES`, `F22_decrypted.bin`, videos, extracted resources or dumped textures (see `.gitignore`).
 
 Write reports, docs and code comments in English. The owner writes Hungarian in the chat; answer in Hungarian there.
 
 ## Working with the owner
 - "go on" = continue with the next step, then build, test and report briefly.
-- The owner runs the Windows exe from a game folder holding `RESOURCE.RES`, `F22_decrypted.bin`, `video\` (see README.md). After a change that is
-  worth playing, build, run the self-tests, copy the exe (and docs) into the owner's package and rebuild its zip.
+- The owner runs the Windows exe (usually through `f22launcher.exe`) from a game folder holding `F22.EXE`, `RESOURCE.RES`, `video\` (see README.md).
+  After a change that is worth playing, build, run the self-tests, copy both exes (and docs) into the owner's package and rebuild its zip.
 - Settings and progress: `f22native.sav` next to the exe (do not overwrite the owner's save when testing: run tests from a copy of the folder).
 - Fan project, not affiliated with NovaLogic. The repository is public.
 
@@ -21,7 +22,9 @@ Write reports, docs and code comments in English. The owner writes Hungarian in 
 | File | Role |
 |---|---|
 | `RESOURCE.RES` | the installed game's resource archive (terrain, models, menus, sounds, missions); read by `src/res.cpp` |
-| `F22_decrypted.bin` (or `extracted\F22_decrypted.bin`) | decrypted program image: tables for flight model, weapons, perf records, AI bytecode (0x374c0-0x37a40), key tables |
+| `F22.EXE` | the original program, decrypted in memory (`--exe <path>` overrides): tables for flight model, weapons, perf records, AI bytecode (0x374c0-0x37a40), key tables |
+| `F22_decrypted.bin` (or `extracted\F22_decrypted.bin`) | optional fallback: the same image dumped by `tools/f22unpack.py` |
+| `f22launcher.exe` / `f22launcher.ini` | the launcher (`src/launcher/`); it edits only the `opt` line of `f22native.sav` and its own ini |
 | `video\*.KDV` | videos from the CD's RESOURCE.RES (`tools/f22videos.py`) |
 | `textures\*.png` | optional replaced textures (`--dumptex` creates them) |
 
@@ -38,11 +41,12 @@ use the Edit tool or write the patch script to a file.
 
 ## Tests (all must return rc=0; run from a copy of the game folder)
 `--autotest` (flight self-test: log + screenshots), `--menutest`, `--flowtest`, `--viewtest`, `--geartest`, `--fxtest`, `--wingtest`, `--ilstest`, `--soundtest`,
-`--createtest`, `--ejecttest`, `--aivmtest` (AI interpreter + ported routines), `--aiflight` (one aircraft driven only by the original scripts);
+`--createtest`, `--ejecttest`, `--exetest` (in-memory F22.EXE decryption == F22_decrypted.bin), `--aivmtest` (AI interpreter + ported routines), `--aiflight` (one aircraft driven only by the original scripts);
 `--autotest --aivm` and `--wingtest --aivm` run the same with the original AI scripts. Logs: `autotest.txt`, `viewtest.txt`, `aivmtest.txt`, `aiflight.txt`.
 
 ## Reverse-engineering workflow
-1. `py tools\f22unpack.py` -> `F22_decrypted.bin` (Unicorn runs the original unpacker).
+1. `py tools\f22unpack.py` -> `F22_decrypted.bin` (Unicorn runs the original unpacker) for disassembly; the program itself does the same
+   decryption in C++ (`Exe::loadGameExe`: pass 1 XORs 0x24C4..+0x40 with 9324ABE1/439A9EFA, pass 2 0x27B0-0x8A9A6 with a rolling key).
 2. Disassemble with capstone (32-bit, flat addresses), e.g. `Cs(CS_ARCH_X86, CS_MODE_32).disasm(data[addr:addr+0x400], addr)`; stop-at-`ret` linear sweeps are enough for most routines.
 3. Port the routine to C++ with the original integer arithmetic, quote the address in a comment, add a check to a `--*test` switch.
 4. `tools/f22script.py` disassembles the AI bytecode; `tools/f22res.py`, `f22model.py`, `f22terrain.py`, `f22kdv.py` read the resource formats.

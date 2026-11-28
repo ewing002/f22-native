@@ -1,7 +1,7 @@
 // F-22 Lightning II – native rebuild (Win32 + OpenGL 3.3, no external libraries).
 //
-// Data: RESOURCE.RES (terrain, models, missions) and the decrypted image of the original program
-// (extracted\F22_decrypted.bin – produced by tools\f22unpack.py), which supplies the flight
+// Data: RESOURCE.RES (terrain, models, missions) and the original program F22.EXE, decrypted in memory
+// (sim::Exe::loadGameExe; a ready F22_decrypted.bin is still accepted), which supplies the flight
 // model, the weapons and the AI tables. The game rules are in sim.cpp.
 //
 // Usage:  f22native.exe [MISSION] [--res RESOURCE.RES] [--autotest]
@@ -2247,10 +2247,17 @@ bool runMenuTest(HDC dc) {
 }  // namespace
 
 int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int) {
-  std::string resPath;
+  std::string resPath, exePath;
+  bool exeTest = false;
   for (int i = 1; i < __argc; i++) {
     std::string a = __argv[i];
     if (a == "--res" && i + 1 < __argc) resPath = __argv[++i];
+    else if (a == "--exe" && i + 1 < __argc) exePath = __argv[++i];
+    else if (a == "--exetest") exeTest = true;
+    else if (a == "--size" && i + 1 < __argc) {         // window size, e.g. --size 1920x1080 (the launcher passes it)
+      int w = 0, h = 0;
+      if (std::sscanf(__argv[++i], "%dx%d", &w, &h) == 2 && w >= 640 && h >= 400 && w <= 7680 && h <= 4320) { gW = w; gH = h; }
+    }
     else if (a == "--autotest") { gAutotest = true; gDirect = true; }
     else if (a == "--topdown" && i + 1 < __argc) { gTopdown = true; gDirect = true; gMission = upper(__argv[++i]); if (i + 1 < __argc) gTopH = float(std::atof(__argv[++i])); }
     else if (a == "--menutest") gMenuTest = true;
@@ -2302,9 +2309,43 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int) {
     return 1;
   }
   std::string base = found.substr(0, found.find_last_of("\\/") + 1);
-  if (!gExe.load(base + "extracted\\F22_decrypted.bin") && !gExe.load(base + "F22_decrypted.bin")) {
-    MessageBoxW(nullptr, L"Decrypted image of the original program not found (extracted\\F22_decrypted.bin).\n"
-                         L"Create it with:  py tools\\f22unpack.py",
+  // The original program supplies the tables: F22.EXE is decrypted in memory (next to RESOURCE.RES, next to this
+  // program, or --exe <path>); an F22_decrypted.bin made by tools\f22unpack.py is still accepted as a fallback.
+  std::vector<std::string> exeCand;
+  if (!exePath.empty()) exeCand.push_back(exePath);
+  exeCand.push_back(base + "F22.EXE");
+  exeCand.push_back(exeDir() + "\\F22.EXE");
+  std::string exeUsed;
+  for (auto& p : exeCand) if (gExe.loadGameExe(p)) { exeUsed = p; break; }
+  if (exeUsed.empty()) {
+    if (gExe.load(base + "extracted\\F22_decrypted.bin")) exeUsed = base + "extracted\\F22_decrypted.bin";
+    else if (gExe.load(base + "F22_decrypted.bin")) exeUsed = base + "F22_decrypted.bin";
+  }
+  if (exeTest) {   // the in-memory decryption must give the same image as tools\f22unpack.py
+    sim::Exe a, b;
+    bool okA = false;
+    for (auto& p : exeCand) if (a.loadGameExe(p)) { okA = true; break; }
+    bool okB = b.load(base + "extracted\\F22_decrypted.bin") || b.load(base + "F22_decrypted.bin");
+    FILE* t = std::fopen((exeDir() + "\\exetest.txt").c_str(), "w");
+    int rc = 1;
+    if (t) {
+      std::fprintf(t, "F22.EXE decrypted: %s (%zu bytes)\n", okA ? "yes" : "NO", a.d.size());
+      std::fprintf(t, "F22_decrypted.bin: %s (%zu bytes)\n", okB ? "yes" : "NO", b.d.size());
+      if (okA && okB) {
+        size_t n = 0, first = 0;
+        for (size_t i = 0; i < std::min(a.d.size(), b.d.size()); i++) if (a.d[i] != b.d[i]) { if (!n) first = i; n++; }
+        if (a.d.size() != b.d.size()) n++;
+        std::fprintf(t, "differing bytes: %zu%s\n", n, n ? "" : " -> identical");
+        if (n) std::fprintf(t, "first difference at 0x%zx\n", first);
+        rc = n ? 1 : 0;
+      } else if (okA) rc = 0;   // nothing to compare against, the decryption itself passed its checks
+      std::fclose(t);
+    }
+    return rc;
+  }
+  if (exeUsed.empty()) {
+    MessageBoxW(nullptr, L"F22.EXE (the original game program) not found.\n"
+                         L"Put this program in the game folder (next to F22.EXE and RESOURCE.RES), or specify: --exe <path to F22.EXE>",
                 L"F-22 Lightning II", MB_ICONERROR);
     return 1;
   }

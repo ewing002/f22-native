@@ -1,0 +1,2 @@
+// MinGW / clang builds: embeds the manifest (MSVC builds take launcher.manifest directly).
+1 24 "launcher.manifest"
